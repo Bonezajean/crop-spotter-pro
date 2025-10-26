@@ -29,7 +29,11 @@ const App = () => (
           <Route path="/assessor" element={<AssessorLayout />}>
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="risk-assessment" element={<RiskAssessment />} />
+            <Route path="risk-assessment/:farmerId" element={<RiskAssessment />} />
+            <Route path="risk-assessment/:farmerId/:fieldId" element={<RiskAssessment />} />
             <Route path="crop-monitoring" element={<CropMonitoring />} />
+            <Route path="crop-monitoring/:farmerId" element={<CropMonitoring />} />
+            <Route path="crop-monitoring/:farmerId/:fieldId" element={<CropMonitoring />} />
             <Route path="loss-assessment" element={<LossAssessment />} />
             <Route path="field-detail/:id" element={<FieldDetail />} />
           </Route>
