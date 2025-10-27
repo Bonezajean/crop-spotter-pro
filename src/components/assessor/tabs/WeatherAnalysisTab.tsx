@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Cloud, Droplets, Wind, Thermometer } from "lucide-react";
+import { Bar, BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 interface WeatherData {
   date: string;
@@ -23,6 +25,45 @@ const mockWeatherForecast: WeatherData[] = [
   { date: "Oct 28", tempHigh: 29, tempLow: 18, rain: 0.0, humidity: 58, clouds: 30, wind: 1 },
   { date: "Oct 29", tempHigh: 30, tempLow: 19, rain: 0.2, humidity: 62, clouds: 40, wind: 2 },
 ];
+
+// Generate historical precipitation data for full year
+const generatePrecipitationData = () => {
+  const data = [];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  
+  for (let m = 0; m < 12; m++) {
+    for (let d = 1; d <= daysInMonth[m]; d += 7) {
+      data.push({
+        date: `${months[m]} ${d}`,
+        precipitation: Math.random() * 35
+      });
+    }
+  }
+  return data;
+};
+
+// Generate historical temperature data for full year
+const generateTemperatureData = () => {
+  const data = [];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  
+  for (let m = 0; m < 12; m++) {
+    for (let d = 1; d <= daysInMonth[m]; d += 7) {
+      const baseTemp = 20 + Math.sin((m / 12) * Math.PI * 2) * 8;
+      data.push({
+        date: `${months[m]} ${d}`,
+        maxTemp: baseTemp + 5 + Math.random() * 5,
+        minTemp: baseTemp - 5 + Math.random() * 5
+      });
+    }
+  }
+  return data;
+};
+
+const precipitationData = generatePrecipitationData();
+const temperatureData = generateTemperatureData();
 
 interface WeatherAnalysisTabProps {
   fieldId: string;
@@ -133,6 +174,85 @@ export const WeatherAnalysisTab = ({ fieldId, farmerName, cropType, location }: 
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* Historical Weather Charts */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Historical Weather Charts (Full Year)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          {/* Daily Precipitation Chart */}
+          <div>
+            <h3 className="text-sm font-medium mb-4">Daily precipitation, mm</h3>
+            <ChartContainer
+              config={{
+                precipitation: {
+                  label: "2025",
+                  color: "hsl(var(--primary))",
+                },
+              }}
+              className="h-[300px]"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={precipitationData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fill: "hsl(var(--muted-foreground))" }}
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fill: "hsl(var(--muted-foreground))" }}
+                    label={{ value: 'Precipitation (mm)', angle: -90, position: 'insideLeft', fill: "hsl(var(--muted-foreground))" }}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Legend wrapperStyle={{ color: "hsl(var(--foreground))" }} />
+                  <Bar dataKey="precipitation" fill="hsl(var(--primary))" name="2025" />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </div>
+
+          {/* Daily Temperature Chart */}
+          <div>
+            <h3 className="text-sm font-medium mb-4">Daily temperatures, °C</h3>
+            <ChartContainer
+              config={{
+                maxTemp: {
+                  label: "2025 Max t°C",
+                  color: "hsl(var(--destructive))",
+                },
+                minTemp: {
+                  label: "2025 Min t°C",
+                  color: "hsl(var(--chart-2))",
+                },
+              }}
+              className="h-[300px]"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={temperatureData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fill: "hsl(var(--muted-foreground))" }}
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fill: "hsl(var(--muted-foreground))" }}
+                    label={{ value: 'Temperature (°C)', angle: -90, position: 'insideLeft', fill: "hsl(var(--muted-foreground))" }}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Legend wrapperStyle={{ color: "hsl(var(--foreground))" }} />
+                  <Line type="monotone" dataKey="maxTemp" stroke="hsl(var(--destructive))" name="2025 Max t°C" strokeWidth={2} />
+                  <Line type="monotone" dataKey="minTemp" stroke="hsl(var(--chart-2))" name="2025 Min t°C" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </div>
         </CardContent>
       </Card>
 
