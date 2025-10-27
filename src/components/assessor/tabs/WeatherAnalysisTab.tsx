@@ -162,16 +162,24 @@ export const WeatherAnalysisTab = ({ fieldId, farmerName, cropType, location }: 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockWeatherForecast.map((day) => (
-                <TableRow key={day.date}>
-                  <TableCell className="font-medium">{day.date}</TableCell>
-                  <TableCell>{day.tempHigh} / {day.tempLow}</TableCell>
-                  <TableCell>{day.rain}</TableCell>
-                  <TableCell>{day.humidity}%</TableCell>
-                  <TableCell>{day.clouds}%</TableCell>
-                  <TableCell>{day.wind} m/s</TableCell>
-                </TableRow>
-              ))}
+              {mockWeatherForecast.map((day) => {
+                const highTempRisk = day.tempHigh > 30;
+                const rainRisk = day.rain > 20;
+                return (
+                  <TableRow key={day.date}>
+                    <TableCell className="font-medium">{day.date}</TableCell>
+                    <TableCell className={highTempRisk ? "text-destructive font-semibold" : ""}>
+                      {day.tempHigh} / {day.tempLow}
+                    </TableCell>
+                    <TableCell className={rainRisk ? "text-destructive font-semibold" : ""}>
+                      {day.rain}
+                    </TableCell>
+                    <TableCell>{day.humidity}%</TableCell>
+                    <TableCell>{day.clouds}%</TableCell>
+                    <TableCell>{day.wind} m/s</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -193,27 +201,41 @@ export const WeatherAnalysisTab = ({ fieldId, farmerName, cropType, location }: 
                   color: "hsl(var(--primary))",
                 },
               }}
-              className="h-[300px]"
+              className="h-[350px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={precipitationData}>
+                <BarChart data={precipitationData} margin={{ bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis 
                     dataKey="date" 
                     stroke="hsl(var(--muted-foreground))"
-                    tick={{ fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                    interval="preserveStartEnd"
                   />
                   <YAxis 
                     stroke="hsl(var(--muted-foreground))"
                     tick={{ fill: "hsl(var(--muted-foreground))" }}
                     label={{ value: 'Precipitation (mm)', angle: -90, position: 'insideLeft', fill: "hsl(var(--muted-foreground))" }}
+                    domain={[0, 40]}
                   />
-                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartTooltip 
+                    content={<ChartTooltipContent />}
+                    cursor={{ fill: "hsl(var(--muted) / 0.2)" }}
+                  />
                   <Legend wrapperStyle={{ color: "hsl(var(--foreground))" }} />
-                  <Bar dataKey="precipitation" fill="hsl(var(--primary))" name="2025" />
+                  <Bar dataKey="precipitation" fill="hsl(var(--primary))" name="2025" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartContainer>
+            {/* BBCH Growth Stage Strip */}
+            <div className="mt-2 flex h-6 rounded overflow-hidden">
+              <div className="bg-yellow-500 flex-1 flex items-center justify-center text-xs font-medium text-black">Germination</div>
+              <div className="bg-lime-400 flex-1 flex items-center justify-center text-xs font-medium text-black">Seedling</div>
+              <div className="bg-green-500 flex-1 flex items-center justify-center text-xs font-medium text-white">Vegetative</div>
+              <div className="bg-emerald-600 flex-1 flex items-center justify-center text-xs font-medium text-white">Flowering</div>
+              <div className="bg-amber-600 flex-1 flex items-center justify-center text-xs font-medium text-white">Fruit Dev</div>
+              <div className="bg-orange-700 flex-1 flex items-center justify-center text-xs font-medium text-white">Ripening</div>
+            </div>
           </div>
 
           {/* Daily Temperature Chart */}
@@ -223,35 +245,49 @@ export const WeatherAnalysisTab = ({ fieldId, farmerName, cropType, location }: 
               config={{
                 maxTemp: {
                   label: "2025 Max t°C",
-                  color: "hsl(var(--destructive))",
+                  color: "hsl(var(--primary))",
                 },
                 minTemp: {
                   label: "2025 Min t°C",
                   color: "hsl(var(--chart-2))",
                 },
               }}
-              className="h-[300px]"
+              className="h-[350px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={temperatureData}>
+                <LineChart data={temperatureData} margin={{ bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis 
                     dataKey="date" 
                     stroke="hsl(var(--muted-foreground))"
-                    tick={{ fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                    interval="preserveStartEnd"
                   />
                   <YAxis 
                     stroke="hsl(var(--muted-foreground))"
                     tick={{ fill: "hsl(var(--muted-foreground))" }}
                     label={{ value: 'Temperature (°C)', angle: -90, position: 'insideLeft', fill: "hsl(var(--muted-foreground))" }}
+                    domain={[10, 40]}
                   />
-                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartTooltip 
+                    content={<ChartTooltipContent />}
+                    cursor={{ stroke: "hsl(var(--muted))", strokeWidth: 1 }}
+                  />
                   <Legend wrapperStyle={{ color: "hsl(var(--foreground))" }} />
-                  <Line type="monotone" dataKey="maxTemp" stroke="hsl(var(--destructive))" name="2025 Max t°C" strokeWidth={2} />
-                  <Line type="monotone" dataKey="minTemp" stroke="hsl(var(--chart-2))" name="2025 Min t°C" strokeWidth={2} />
+                  <Line type="monotone" dataKey="maxTemp" stroke="hsl(var(--primary))" name="2025 Max t°C" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="minTemp" stroke="hsl(var(--chart-2))" name="2025 Min t°C" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </ChartContainer>
+            {/* BBCH Growth Stage Strip */}
+            <div className="mt-2 flex h-6 rounded overflow-hidden">
+              <div className="bg-yellow-500 flex-1 flex items-center justify-center text-xs font-medium text-black">Germination</div>
+              <div className="bg-lime-400 flex-1 flex items-center justify-center text-xs font-medium text-black">Seedling</div>
+              <div className="bg-green-500 flex-1 flex items-center justify-center text-xs font-medium text-white">Vegetative</div>
+              <div className="bg-emerald-600 flex-1 flex items-center justify-center text-xs font-medium text-white">Flowering</div>
+              <div className="bg-amber-600 flex-1 flex items-center justify-center text-xs font-medium text-white">Fruit Dev</div>
+              <div className="bg-orange-700 flex-1 flex items-center justify-center text-xs font-medium text-white">Ripening</div>
+            </div>
           </div>
         </CardContent>
       </Card>

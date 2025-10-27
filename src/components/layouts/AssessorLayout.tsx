@@ -24,7 +24,7 @@ const AssessorLayout = () => {
           <Link to="/assessor/dashboard" className="flex items-center gap-2">
             <Leaf className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-xl font-bold text-sidebar-foreground">AgriGuard</h1>
+              <h1 className="text-xl font-bold text-sidebar-foreground">Starhawk</h1>
               <p className="text-xs text-muted-foreground">Assessor Portal</p>
             </div>
           </Link>
@@ -34,15 +34,19 @@ const AssessorLayout = () => {
         <nav className="flex-1 p-4 space-y-2">
           {navigation.map((item) => {
             const Icon = item.icon;
+            const active = isActive(item.href);
             return (
-              <Link key={item.name} to={item.href}>
+              <Link key={item.name} to={item.href} className="relative block">
+                {active && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
+                )}
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start gap-3",
-                    isActive(item.href)
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    "w-full justify-start gap-3 relative",
+                    active
+                      ? "bg-transparent text-primary hover:bg-transparent"
+                      : "text-sidebar-foreground hover:bg-sidebar-border hover:text-sidebar-foreground"
                   )}
                 >
                   <Icon className="h-5 w-5" />
