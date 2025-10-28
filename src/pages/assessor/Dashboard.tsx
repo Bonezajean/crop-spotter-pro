@@ -16,7 +16,7 @@ interface Farmer {
 }
 
 interface Field {
-  id: string;
+  id: string | null;
   farmerId: string;
   farmerName: string;
   crop: string;
@@ -40,9 +40,9 @@ const Dashboard = () => {
   const allFields: Field[] = [
     { id: "FLD-001", farmerId: "F-001", farmerName: "Mugabo John", crop: "Maize", area: 3.4, season: "B", status: "healthy" },
     { id: "FLD-002", farmerId: "F-002", farmerName: "Kamali Peace", crop: "Wheat", area: 2.1, season: "A", status: "moderate" },
-    { id: "FLD-003", farmerId: "F-003", farmerName: "Uwase Marie", crop: "Soybean", area: 1.8, season: "B", status: "active" },
+    { id: null, farmerId: "F-003", farmerName: "Uwase Marie", crop: "Soybean", area: 1.8, season: "B", status: "active" },
     { id: "FLD-004", farmerId: "F-001", farmerName: "Mugabo John", crop: "Rice", area: 2.5, season: "A", status: "healthy" },
-    { id: "FLD-005", farmerId: "F-001", farmerName: "Mugabo John", crop: "Beans", area: 1.4, season: "B", status: "active" },
+    { id: null, farmerId: "F-001", farmerName: "Mugabo John", crop: "Beans", area: 1.4, season: "B", status: "active" },
   ];
 
   const fields = selectedFarmer 
@@ -71,7 +71,11 @@ const Dashboard = () => {
   ];
 
   const fieldColumns = [
-    { key: "id", label: "Field ID" },
+    { 
+      key: "id", 
+      label: "Field ID",
+      render: (field: Field) => field.id || <span className="text-muted-foreground italic">Not processed</span>
+    },
     { key: "farmerName", label: "Farmer" },
     { 
       key: "crop", 
@@ -92,7 +96,12 @@ const Dashboard = () => {
     { 
       key: "status", 
       label: "Status",
-      render: (field: Field) => <StatusBadge status={field.status} />
+      render: (field: Field) => (
+        <StatusBadge 
+          status={field.id ? "healthy" : "pending"} 
+          label={field.id ? "Processed" : "Processing Needed"}
+        />
+      )
     },
     { 
       key: "actions", 
@@ -102,9 +111,9 @@ const Dashboard = () => {
           <Button 
             size="sm" 
             variant="outline"
-            onClick={() => navigate(`/assessor/field-detail/${field.id}`)}
+            onClick={() => navigate(field.id ? `/assessor/field/${field.id}` : `/assessor/field-processing?fieldId=${field.farmerName}&farmer=${field.farmerName}`)}
           >
-            View
+            {field.id ? "👁️ View Data" : "✏️ Process"}
           </Button>
         </div>
       )

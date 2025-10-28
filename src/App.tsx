@@ -12,6 +12,7 @@ import RiskAssessment from "./pages/assessor/RiskAssessment";
 import CropMonitoring from "./pages/assessor/CropMonitoring";
 import LossAssessment from "./pages/assessor/LossAssessment";
 import FieldDetail from "./pages/assessor/FieldDetail";
+import FieldProcessing from "./pages/assessor/FieldProcessing";
 
 const queryClient = new QueryClient();
 
@@ -35,7 +36,8 @@ const App = () => (
             <Route path="crop-monitoring/:farmerId" element={<CropMonitoring />} />
             <Route path="crop-monitoring/:farmerId/:fieldId" element={<CropMonitoring />} />
             <Route path="loss-assessment" element={<LossAssessment />} />
-            <Route path="field-detail/:id" element={<FieldDetail />} />
+            <Route path="field/:id" element={<FieldDetail />} />
+            <Route path="field-processing" element={<FieldProcessing />} />
           </Route>
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
