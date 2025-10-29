@@ -134,6 +134,17 @@ const Login = () => {
               </Button>
             </div>
           </form>
+          
+          <div className="text-center text-sm text-muted-foreground mt-4 pt-4 border-t border-border">
+            Don't have an account?{" "}
+            <Button
+              variant="link"
+              className="p-0 h-auto text-primary"
+              onClick={() => navigate("/register")}
+            >
+              Register here
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
