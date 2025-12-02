@@ -75,105 +75,76 @@ const FieldDetail = () => {
 
         {/* Basic Info Tab */}
         <TabsContent value="basic" className="space-y-6">
-          {/* Field Information Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Field Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Field ID</p>
-                  <p className="font-medium">{field.id}</p>
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Field Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Field ID</span>
+                  <span className="font-medium">{field.id}</span>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Field Name</p>
-                  <p className="font-medium">{field.name}</p>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Field Name</span>
+                  <span className="font-medium">{field.name}</span>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Farmer</p>
-                  <p className="font-medium">{field.farmer}</p>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Farmer</span>
+                  <span className="font-medium">{field.farmer}</span>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Crop Type</p>
-                  <p className="font-medium flex items-center gap-2">
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Crop Type</span>
+                  <span className="font-medium flex items-center gap-2">
                     <Sprout className="h-4 w-4 text-primary" />
                     {field.crop}
-                  </p>
+                  </span>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Area</p>
-                  <p className="font-medium">{field.area} hectares</p>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Area</span>
+                  <span className="font-medium">{field.area} hectares</span>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Season</p>
-                  <p className="font-medium">{field.season}</p>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Season</span>
+                  <span className="font-medium">{field.season}</span>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Sowing Date</p>
-                  <p className="font-medium flex items-center gap-2">
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Sowing Date</span>
+                  <span className="font-medium flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     {field.sowingDate}
-                  </p>
+                  </span>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Location</p>
-                  <p className="font-medium flex items-center gap-2">
+                <div className="flex justify-between py-2">
+                  <span className="text-muted-foreground">Location</span>
+                  <span className="font-medium flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
                     {field.location}
-                  </p>
+                  </span>
                 </div>
-              </div>
-              <div className="flex gap-2 mt-6">
-                <Button variant="outline">Edit Info</Button>
-                <Button variant="outline">View History</Button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Full Width NDVI Map */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Field Map - NDVI Heatmap</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative h-[500px] bg-muted/30 rounded-lg overflow-hidden">
-                {/* Placeholder for actual Mapbox integration */}
-                <div className="absolute inset-0 flex items-center justify-center">
+            <Card>
+              <CardHeader>
+                <CardTitle>Field Map</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
                   <div className="text-center text-muted-foreground">
-                    <MapPin className="h-16 w-16 mx-auto mb-3 opacity-50" />
-                    <p className="text-lg">NDVI Heatmap View</p>
-                    <p className="text-sm mt-1">Field: {field.id}</p>
-                    <p className="text-xs mt-2 text-primary">Bounded field with health overlay</p>
+                    <MapPin className="h-12 w-12 mx-auto mb-2" />
+                    <p>Map Integration</p>
+                    <p className="text-sm">Field boundary visualization</p>
                   </div>
                 </div>
-                
-                {/* NDVI Legend */}
-                <div className="absolute bottom-4 right-4 bg-card/95 backdrop-blur border border-border rounded-lg p-4 space-y-2">
-                  <p className="font-medium text-sm mb-3">NDVI Legend</p>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-4 h-4 rounded bg-green-500"></div>
-                    <span>Healthy (0.6 - 1.0)</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-4 h-4 rounded bg-yellow-500"></div>
-                    <span>Moderate (0.3 - 0.6)</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-4 h-4 rounded bg-red-500"></div>
-                    <span>Stressed (0 - 0.3)</span>
-                  </div>
-                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-                {/* Map Controls */}
-                <div className="absolute top-4 right-4 flex flex-col gap-2">
-                  <Button size="sm" variant="secondary" className="bg-card/95 backdrop-blur">
-                    Refresh NDVI
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex gap-2">
+            <Button variant="outline">Edit Info</Button>
+            <Button variant="outline">View History</Button>
+          </div>
         </TabsContent>
 
         {/* Weather Analysis Tab */}
