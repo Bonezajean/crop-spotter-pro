@@ -68,30 +68,41 @@ export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneA
   const parseReportText = (text: string): ParsedReportData => {
     // Remove branding/metadata
     const cleanText = text
-      .replace(/Powered by Agremo/gi, "")
+      .replace(/Powered by[:\s]*agremo/gi, "")
       .replace(/app\.agremo\.com/gi, "")
+      .replace(/Walk through your map on/gi, "")
       .replace(/Agremo/gi, "");
 
-    // Extract crop type
-    const cropMatch = cleanText.match(/(?:PLANT STRESS ANALYSIS|ANALYSIS)\s+([a-zA-Z\s]+?)(?:\s+Field area|\s+Survey)/i);
+    console.log("Cleaned PDF text:", cleanText);
+
+    // Extract crop type - look for "Crop:" pattern
+    const cropMatch = cleanText.match(/Crop[:\s]+([a-zA-Z\s]+?)(?:\s*Field area|\s*Growing|\s*Analysis|\n)/i);
     const crop = cropMatch ? cropMatch[1].trim() : "Unknown";
 
     // Extract field area
-    const areaMatch = cleanText.match(/Field area[:\s]+(\d+\.?\d*)\s*(?:Hectare|ha)/i);
+    const areaMatch = cleanText.match(/Field area[:\s]*(\d+\.?\d*)\s*(?:Hectare|ha)?/i);
     const fieldAreaHa = areaMatch ? parseFloat(areaMatch[1]) : 0;
 
     // Extract survey date
-    const dateMatch = cleanText.match(/Survey date[:\s]+(\d{2}[-/]\d{2}[-/]\d{4})/i);
+    const dateMatch = cleanText.match(/Survey date[:\s]*(\d{2}[-/]\d{2}[-/]\d{4})/i);
     const surveyDate = dateMatch ? dateMatch[1].replace(/\//g, "-") : "";
 
     // Extract growing stage (BBCH)
-    const stageMatch = cleanText.match(/BBCH\s*(\d+)/i);
+    const stageMatch = cleanText.match(/(?:Growing stage[:\s]*)?BBCH\s*(\d+)/i);
     const growingStage = stageMatch ? `BBCH ${stageMatch[1]}` : "Not specified";
 
-    // Extract stress levels
-    const fineMatch = cleanText.match(/Fine\s+(\d+\.?\d*)%?\s+(\d+\.?\d*)\s*ha/i);
-    const potentialMatch = cleanText.match(/Potential\s+(?:Plant\s+)?Stress\s+(\d+\.?\d*)%?\s+(\d+\.?\d*)\s*ha/i);
-    const plantStressMatch = cleanText.match(/Plant\s+Stress\s+(\d+\.?\d*)%?\s+(\d+\.?\d*)\s*ha/i);
+    // Extract stress levels - handle various formats from PDF text extraction
+    // Pattern: "Fine 30.87% 9.84" or "Fine 30.87 % 9.84 ha"
+    const fineMatch = cleanText.match(/Fine\s+(\d+\.?\d*)\s*%?\s+(\d+\.?\d*)/i);
+    
+    // Potential Plant Stress - may appear as "Potential Plant Stress" or split across lines
+    const potentialMatch = cleanText.match(/Potential\s*(?:Plant)?\s*Stress\s+(\d+\.?\d*)\s*%?\s+(\d+\.?\d*)/i);
+    
+    // Plant Stress (but not "Potential Plant Stress")
+    // Use negative lookbehind to avoid matching "Potential Plant Stress"
+    const plantStressMatch = cleanText.match(/(?<!Potential\s*)Plant\s+Stress\s+(\d+\.?\d*)\s*%?\s+(\d+\.?\d*)/i);
+
+    console.log("Parsed values:", { crop, fieldAreaHa, surveyDate, growingStage, fineMatch, potentialMatch, plantStressMatch });
 
     return {
       report_info: {
