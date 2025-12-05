@@ -1,12 +1,15 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CloudUpload, FileCheck, AlertCircle } from "lucide-react";
+import { CloudUpload, FileCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import area from "@turf/area";
+import { kml } from "@tmcw/togeojson";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 interface FieldUploadInterfaceProps {
   fieldId: string | null;
@@ -20,6 +23,53 @@ export const FieldUploadInterface = ({ fieldId, farmerName, onBack }: FieldUploa
   const [uploading, setUploading] = useState(false);
   const [geometry, setGeometry] = useState<any>(null);
   const [calculatedArea, setCalculatedArea] = useState<number | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const geoJsonLayerRef = useRef<L.GeoJSON | null>(null);
+
+  // Initialize map when geometry is available
+  useEffect(() => {
+    if (!geometry || !mapContainerRef.current) return;
+
+    // Initialize map if not already done
+    if (!mapRef.current) {
+      mapRef.current = L.map(mapContainerRef.current).setView([0, 0], 2);
+      
+      // Add OpenStreetMap tiles
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(mapRef.current);
+    }
+
+    // Remove existing GeoJSON layer if any
+    if (geoJsonLayerRef.current) {
+      mapRef.current.removeLayer(geoJsonLayerRef.current);
+    }
+
+    // Add new GeoJSON layer with NDVI-style coloring
+    geoJsonLayerRef.current = L.geoJSON(geometry, {
+      style: {
+        color: "#10b981",
+        weight: 3,
+        fillColor: "#22c55e",
+        fillOpacity: 0.4
+      }
+    }).addTo(mapRef.current);
+
+    // Fit map to the geometry bounds
+    const bounds = geoJsonLayerRef.current.getBounds();
+    if (bounds.isValid()) {
+      mapRef.current.fitBounds(bounds, { padding: [20, 20] });
+    }
+
+    return () => {
+      // Cleanup on unmount
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [geometry]);
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -33,14 +83,25 @@ export const FieldUploadInterface = ({ fieldId, farmerName, onBack }: FieldUploa
 
       if (file.name.endsWith('.geojson') || file.name.endsWith('.json')) {
         geoJSON = JSON.parse(text);
-      } else if (file.name.endsWith('.kml') || file.name.endsWith('.kmz')) {
+      } else if (file.name.endsWith('.kml')) {
+        // Parse KML using togeojson library
+        const parser = new DOMParser();
+        const kmlDoc = parser.parseFromString(text, "text/xml");
+        geoJSON = kml(kmlDoc);
+        
+        if (!geoJSON.features || geoJSON.features.length === 0) {
+          throw new Error("No valid geometry found in KML file");
+        }
+      } else if (file.name.endsWith('.kmz')) {
         toast({
-          title: "KML/KMZ Upload",
-          description: "KML/KMZ conversion will be handled by backend",
+          title: "KMZ Not Supported",
+          description: "Please extract the KML file from the KMZ archive and upload it directly",
+          variant: "destructive",
         });
+        setUploading(false);
         return;
       } else {
-        throw new Error("Unsupported file format");
+        throw new Error("Unsupported file format. Please use .geojson, .json, or .kml");
       }
 
       // Calculate area in hectares
@@ -75,7 +136,6 @@ export const FieldUploadInterface = ({ fieldId, farmerName, onBack }: FieldUploa
       return;
     }
 
-    // TODO: Call EOSDA API to register field and get Field ID
     toast({
       title: "Processing Field",
       description: "Syncing with EOSDA API to generate Field ID...",
@@ -109,12 +169,12 @@ export const FieldUploadInterface = ({ fieldId, farmerName, onBack }: FieldUploa
                 {geometry ? "File Uploaded" : "Drop your field file here"}
               </h3>
               <p className="text-muted-foreground">
-                or click to browse your files
+                Supported formats: .geojson, .json, .kml
               </p>
             </div>
             <Input
               type="file"
-              accept=".geojson,.json,.kml,.kmz,.shp,.zip"
+              accept=".geojson,.json,.kml"
               onChange={handleFileUpload}
               disabled={uploading}
               className="max-w-md mx-auto cursor-pointer file:cursor-pointer"
@@ -129,11 +189,25 @@ export const FieldUploadInterface = ({ fieldId, farmerName, onBack }: FieldUploa
       {/* Geometry Preview & Metadata */}
       {geometry && calculatedArea && (
         <div className="grid md:grid-cols-2 gap-6">
+          {/* Map Preview */}
+          <Card className="md:col-span-1">
+            <CardHeader>
+              <CardTitle>Field Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div 
+                ref={mapContainerRef}
+                className="aspect-square rounded-lg border border-border overflow-hidden"
+                style={{ minHeight: "300px" }}
+              />
+            </CardContent>
+          </Card>
+
           {/* Geometry Info */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileCheck className="h-5 w-5 text-success" />
+                <FileCheck className="h-5 w-5 text-green-500" />
                 Geometry Captured
               </CardTitle>
             </CardHeader>
@@ -150,21 +224,9 @@ export const FieldUploadInterface = ({ fieldId, farmerName, onBack }: FieldUploa
                 <Label>Season (Auto-filled)</Label>
                 <Input value="Season B" disabled />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Map Preview */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Field Preview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="aspect-square bg-muted rounded-lg flex items-center justify-center border border-border">
-                <div className="text-center text-muted-foreground">
-                  <AlertCircle className="h-12 w-12 mx-auto mb-2" />
-                  <p className="text-sm">Map preview will render here</p>
-                  <p className="text-xs mt-1">Mapbox GL JS integration</p>
-                </div>
+              <div className="space-y-2">
+                <Label>Features Count</Label>
+                <Input value={`${geometry.features?.length || 1} feature(s)`} disabled />
               </div>
             </CardContent>
           </Card>
