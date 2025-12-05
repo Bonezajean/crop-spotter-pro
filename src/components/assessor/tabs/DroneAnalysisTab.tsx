@@ -8,10 +8,10 @@ import { Slider } from "@/components/ui/slider";
 import { FieldMapWithLayers } from "../FieldMapWithLayers";
 import { Upload, Calendar, Satellite, UserCheck, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import * as pdfjsLib from "pdfjs-dist";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
 
-// Set worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Set worker for legacy build
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 interface DroneAnalysisTabProps {
   fieldId: string;
