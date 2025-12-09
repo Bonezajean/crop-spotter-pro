@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { FieldMapWithLayers } from "../FieldMapWithLayers";
-import { Upload, Calendar, Satellite, UserCheck, FileText, Loader2 } from "lucide-react";
+import { Upload, Calendar, Satellite, UserCheck, FileText, Loader2, Image, Map } from "lucide-react";
 import { toast } from "sonner";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
 
@@ -34,6 +34,11 @@ interface ParsedReportData {
   };
 }
 
+interface PdfExtractionResult {
+  text: string;
+  pageImages: string[];
+}
+
 export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneAnalysisTabProps) => {
   const [dataSource, setDataSource] = useState<"drone" | "manual">("drone");
   const [manualStress, setManualStress] = useState([17.6]);
@@ -45,23 +50,40 @@ export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneA
   const [isParsing, setIsParsing] = useState(false);
   const [parsedData, setParsedData] = useState<ParsedReportData | null>(null);
   const [rawPdfText, setRawPdfText] = useState<string>("");
+  const [extractedImages, setExtractedImages] = useState<string[]>([]);
+  const [showExtractedMap, setShowExtractedMap] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Extract text from PDF using pdfjs-dist
-  const extractTextFromPdf = async (file: File): Promise<string> => {
+  // Extract text and images from PDF using pdfjs-dist
+  const extractFromPdf = async (file: File): Promise<PdfExtractionResult> => {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     
     let fullText = "";
+    const pageImages: string[] = [];
+    
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
+      
+      // Extract text
       const textContent = await page.getTextContent();
       const pageText = textContent.items
         .map((item: any) => item.str)
         .join(" ");
       fullText += pageText + "\n";
+      
+      // Render page to canvas for image extraction
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d')!;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      
+      await page.render({ canvasContext: context, viewport }).promise;
+      pageImages.push(canvas.toDataURL('image/png'));
     }
-    return fullText;
+    
+    return { text: fullText, pageImages };
   };
 
   // Parse extracted text to structured JSON
@@ -139,12 +161,13 @@ export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneA
 
     setIsParsing(true);
     try {
-      const text = await extractTextFromPdf(file);
+      const { text, pageImages } = await extractFromPdf(file);
       setRawPdfText(text);
+      setExtractedImages(pageImages);
       
       const data = parseReportText(text);
       setParsedData(data);
-      toast.success("PDF parsed successfully");
+      toast.success(`PDF parsed successfully - extracted ${pageImages.length} page(s)`);
     } catch (error) {
       console.error("PDF parsing error:", error);
       toast.error("Failed to parse PDF");
@@ -342,10 +365,56 @@ export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneA
           {/* Visual Map with Layer Controls */}
           <Card>
             <CardHeader>
-              <CardTitle>Field Visualization</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>Field Visualization</span>
+                {extractedImages.length > 0 && (
+                  <div className="flex gap-2">
+                    <Button 
+                      variant={showExtractedMap ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setShowExtractedMap(true)}
+                    >
+                      <Image className="h-4 w-4 mr-1" />
+                      Drone Image
+                    </Button>
+                    <Button 
+                      variant={!showExtractedMap ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setShowExtractedMap(false)}
+                    >
+                      <Map className="h-4 w-4 mr-1" />
+                      Interactive Map
+                    </Button>
+                  </div>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <FieldMapWithLayers fieldId={fieldId} />
+              {showExtractedMap && extractedImages.length > 1 ? (
+                <div className="space-y-4">
+                  <img 
+                    src={extractedImages[1]} 
+                    alt="Extracted Stress Map from Drone Report"
+                    className="w-full rounded-lg border border-border"
+                  />
+                  <div className="flex gap-6 justify-center text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded bg-green-500" />
+                      <span className="text-muted-foreground">Fine</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded bg-yellow-500" />
+                      <span className="text-muted-foreground">Potential Stress</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded bg-red-500" />
+                      <span className="text-muted-foreground">Plant Stress</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <FieldMapWithLayers fieldId={fieldId} />
+              )}
             </CardContent>
           </Card>
         </>
