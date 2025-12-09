@@ -20,17 +20,24 @@ interface DroneAnalysisTabProps {
   area: number;
 }
 
+interface StressLevel {
+  name: string;
+  percentage: number;
+  hectares: number;
+}
+
 interface ParsedReportData {
   report_info: {
     crop: string;
     field_area_ha: number;
     growing_stage: string;
     survey_date: string;
+    analysis_name: string;
   };
-  health_analysis: {
-    fine: { percentage: number; hectares: number };
-    potential_stress: { percentage: number; hectares: number };
-    plant_stress: { percentage: number; hectares: number };
+  stress_levels: StressLevel[];
+  total_affected: {
+    hectares: number;
+    percentage: number;
   };
 }
 
@@ -118,8 +125,8 @@ export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneA
 
     console.log("Cleaned PDF text:", cleanText);
 
-    // Extract crop type - look for "Crop:" pattern
-    const cropMatch = cleanText.match(/Crop[:\s]+([a-zA-Z\s]+?)(?:\s*Field area|\s*Growing|\s*Analysis|\n)/i);
+    // Extract crop type
+    const cropMatch = cleanText.match(/Crop[:\s]+([a-zA-Z\s]+?)(?:\s*Field area|\s*Growing|\s*Analysis|\s*\d|\n)/i);
     const crop = cropMatch ? cropMatch[1].trim() : "Unknown";
 
     // Extract field area
@@ -134,18 +141,41 @@ export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneA
     const stageMatch = cleanText.match(/(?:Growing stage[:\s]*)?BBCH\s*(\d+)/i);
     const growingStage = stageMatch ? `BBCH ${stageMatch[1]}` : "Not specified";
 
-    // Extract stress levels - handle various formats from PDF text extraction
-    // Pattern: "Fine 30.87% 9.84" or "Fine 30.87 % 9.84 ha"
-    const fineMatch = cleanText.match(/Fine\s+(\d+\.?\d*)\s*%?\s+(\d+\.?\d*)/i);
-    
-    // Potential Plant Stress - may appear as "Potential Plant Stress" or split across lines
-    const potentialMatch = cleanText.match(/Potential\s*(?:Plant)?\s*Stress\s+(\d+\.?\d*)\s*%?\s+(\d+\.?\d*)/i);
-    
-    // Plant Stress (but not "Potential Plant Stress")
-    // Use negative lookbehind to avoid matching "Potential Plant Stress"
-    const plantStressMatch = cleanText.match(/(?<!Potential\s*)Plant\s+Stress\s+(\d+\.?\d*)\s*%?\s+(\d+\.?\d*)/i);
+    // Extract analysis name (e.g., "Plant Stress", "Weed Detection", etc.)
+    const analysisMatch = cleanText.match(/Analysis name[:\s]*([a-zA-Z\s]+?)(?:\s*STRESS|\s*LEVEL|\s*TABLE|\n)/i);
+    const analysisName = analysisMatch ? analysisMatch[1].trim() : "Analysis";
 
-    console.log("Parsed values:", { crop, fieldAreaHa, surveyDate, growingStage, fineMatch, potentialMatch, plantStressMatch });
+    // Extract stress level table - dynamic parsing
+    // Look for patterns like "Fine 30.87% 9.84" or "Plant Stress 69.13% 22.04"
+    const stressLevels: StressLevel[] = [];
+    
+    // Match all stress level rows: "Name Percentage% Hectares"
+    const stressTableRegex = /(?:^|\s)(Fine|Potential\s*(?:Plant)?\s*Stress|Plant\s+Stress|Weed\s*(?:Area)?|Pest\s*(?:Area)?|Healthy|Moderate|Stressed|Low|Medium|High)\s+(\d+\.?\d*)\s*%?\s+(\d+\.?\d*)/gi;
+    let match;
+    while ((match = stressTableRegex.exec(cleanText)) !== null) {
+      const name = match[1].trim().replace(/\s+/g, ' ');
+      stressLevels.push({
+        name,
+        percentage: parseFloat(match[2]),
+        hectares: parseFloat(match[3]),
+      });
+    }
+
+    // Extract total affected area
+    const totalMatch = cleanText.match(/Total\s*(?:area)?\s*(?:PLANT\s*STRESS|WEED|PEST|AFFECTED)[:\s]*(\d+\.?\d*)\s*ha\s*=?\s*(\d+\.?\d*)?\s*%?\s*field/i);
+    const totalAffected = {
+      hectares: totalMatch ? parseFloat(totalMatch[1]) : 0,
+      percentage: totalMatch && totalMatch[2] ? parseFloat(totalMatch[2]) : 0,
+    };
+
+    // If no total found, calculate from non-Fine stress levels
+    if (totalAffected.hectares === 0 && stressLevels.length > 0) {
+      const nonFine = stressLevels.filter(s => s.name.toLowerCase() !== 'fine');
+      totalAffected.hectares = nonFine.reduce((sum, s) => sum + s.hectares, 0);
+      totalAffected.percentage = nonFine.reduce((sum, s) => sum + s.percentage, 0);
+    }
+
+    console.log("Parsed values:", { crop, fieldAreaHa, surveyDate, growingStage, analysisName, stressLevels, totalAffected });
 
     return {
       report_info: {
@@ -153,21 +183,10 @@ export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneA
         field_area_ha: fieldAreaHa,
         growing_stage: growingStage,
         survey_date: surveyDate,
+        analysis_name: analysisName,
       },
-      health_analysis: {
-        fine: {
-          percentage: fineMatch ? parseFloat(fineMatch[1]) : 0,
-          hectares: fineMatch ? parseFloat(fineMatch[2]) : 0,
-        },
-        potential_stress: {
-          percentage: potentialMatch ? parseFloat(potentialMatch[1]) : 0,
-          hectares: potentialMatch ? parseFloat(potentialMatch[2]) : 0,
-        },
-        plant_stress: {
-          percentage: plantStressMatch ? parseFloat(plantStressMatch[1]) : 0,
-          hectares: plantStressMatch ? parseFloat(plantStressMatch[2]) : 0,
-        },
-      },
+      stress_levels: stressLevels,
+      total_affected: totalAffected,
     };
   };
 
@@ -197,10 +216,12 @@ export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneA
     }
   };
 
-  // Calculate healthy area from parsed data
-  const healthyHa = parsedData?.health_analysis.fine.hectares ?? 2.8;
-  const stressPercent = parsedData?.health_analysis.plant_stress.percentage ?? 17.6;
+  // Calculate values from parsed data
   const totalArea = parsedData?.report_info.field_area_ha ?? area;
+  const fineLevel = parsedData?.stress_levels.find(s => s.name.toLowerCase() === 'fine');
+  const healthyHa = fineLevel?.hectares ?? 2.8;
+  const totalAffectedHa = parsedData?.total_affected.hectares ?? 0;
+  const totalAffectedPercent = parsedData?.total_affected.percentage ?? 0;
 
   return (
     <div className="space-y-6">
@@ -323,49 +344,77 @@ export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneA
           <Card>
             <CardHeader>
               <CardTitle>
-                {parsedData ? "Extracted Metrics" : "Drone Metrics"}
+                {parsedData ? parsedData.report_info.analysis_name : "Drone Metrics"}
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="p-4 rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground mb-1">Healthy Area (Fine)</p>
-                <p className="text-2xl font-bold text-success">{healthyHa.toFixed(2)} ha</p>
-                {parsedData && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ({parsedData.health_analysis.fine.percentage}%)
+            <CardContent className="space-y-6">
+              {/* Report Info */}
+              <div className="grid md:grid-cols-4 gap-4">
+                <div className="p-4 rounded-lg bg-muted/50">
+                  <p className="text-sm text-muted-foreground mb-1">Crop</p>
+                  <p className="text-xl font-bold">{parsedData?.report_info.crop || cropType}</p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/50">
+                  <p className="text-sm text-muted-foreground mb-1">Field Area</p>
+                  <p className="text-xl font-bold">{totalArea} Hectare</p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/50">
+                  <p className="text-sm text-muted-foreground mb-1">Growing Stage</p>
+                  <p className="text-xl font-bold">{parsedData?.report_info.growing_stage || "N/A"}</p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/50">
+                  <p className="text-sm text-muted-foreground mb-1">Analysis Name</p>
+                  <p className="text-xl font-bold">{parsedData?.report_info.analysis_name || "N/A"}</p>
+                </div>
+              </div>
+
+              {/* Stress Level Table */}
+              {parsedData && parsedData.stress_levels.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-3">Stress Level Table</h4>
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left p-3 text-sm font-medium">Stress Level</th>
+                          <th className="text-right p-3 text-sm font-medium">%</th>
+                          <th className="text-right p-3 text-sm font-medium">Hectare</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsedData.stress_levels.map((level, idx) => (
+                          <tr key={idx} className="border-t border-border">
+                            <td className="p-3 flex items-center gap-2">
+                              <div 
+                                className={`w-3 h-3 rounded ${
+                                  level.name.toLowerCase() === 'fine' ? 'bg-green-500' :
+                                  level.name.toLowerCase().includes('potential') ? 'bg-yellow-500' :
+                                  'bg-red-500'
+                                }`} 
+                              />
+                              {level.name}
+                            </td>
+                            <td className="p-3 text-right font-medium">{level.percentage.toFixed(2)}%</td>
+                            <td className="p-3 text-right font-medium">{level.hectares.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Total Affected Area */}
+              {parsedData && parsedData.total_affected.hectares > 0 && (
+                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/30">
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Total Area {parsedData.report_info.analysis_name.toUpperCase()}:
                   </p>
-                )}
-              </div>
-              <div className="p-4 rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground mb-1">Plant Stress</p>
-                <p className="text-2xl font-bold text-destructive">{stressPercent}%</p>
-                {parsedData && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ({parsedData.health_analysis.plant_stress.hectares} ha)
+                  <p className="text-2xl font-bold text-destructive">
+                    {parsedData.total_affected.hectares.toFixed(2)} ha = {parsedData.total_affected.percentage.toFixed(0)}% field
                   </p>
-                )}
-              </div>
-              <div className="p-4 rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground mb-1">Potential Stress</p>
-                <p className="text-2xl font-bold text-warning">
-                  {parsedData?.health_analysis.potential_stress.percentage ?? 0}%
-                </p>
-                {parsedData && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ({parsedData.health_analysis.potential_stress.hectares} ha)
-                  </p>
-                )}
-              </div>
-              <div className="p-4 rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground mb-1">Field Area</p>
-                <p className="text-2xl font-bold text-primary">{totalArea} ha</p>
-              </div>
-              <div className="p-4 rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground mb-1">Growing Stage</p>
-                <p className="text-2xl font-bold text-primary">
-                  {parsedData?.report_info.growing_stage || "N/A"}
-                </p>
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -418,20 +467,22 @@ export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneA
                     alt="Extracted Stress Map from Drone Report"
                     className="w-full rounded-lg border border-border"
                   />
-                  <div className="flex gap-6 justify-center text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-green-500" />
-                      <span className="text-muted-foreground">Fine</span>
+                  {parsedData && parsedData.stress_levels.length > 0 && (
+                    <div className="flex flex-wrap gap-6 justify-center text-sm">
+                      {parsedData.stress_levels.map((level, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <div 
+                            className={`w-4 h-4 rounded ${
+                              level.name.toLowerCase() === 'fine' ? 'bg-green-500' :
+                              level.name.toLowerCase().includes('potential') ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`} 
+                          />
+                          <span className="text-muted-foreground">{level.name}</span>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-yellow-500" />
-                      <span className="text-muted-foreground">Potential Stress</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-red-500" />
-                      <span className="text-muted-foreground">Plant Stress</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               ) : (
                 <FieldMapWithLayers fieldId={fieldId} />
