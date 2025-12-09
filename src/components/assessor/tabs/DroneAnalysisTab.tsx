@@ -73,14 +73,35 @@ export const DroneAnalysisTab = ({ fieldId, farmerName, cropType, area }: DroneA
       fullText += pageText + "\n";
       
       // Render page to canvas for image extraction
-      const viewport = page.getViewport({ scale: 1.5 });
+      const viewport = page.getViewport({ scale: 2 });
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d')!;
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       
       await page.render({ canvasContext: context, viewport }).promise;
-      pageImages.push(canvas.toDataURL('image/png'));
+      
+      // For page 2 (map page), crop out header and footer branding
+      if (i === 2) {
+        const cropTop = Math.floor(viewport.height * 0.08); // Remove top 8%
+        const cropBottom = Math.floor(viewport.height * 0.08); // Remove bottom 8%
+        const croppedHeight = viewport.height - cropTop - cropBottom;
+        
+        const croppedCanvas = document.createElement('canvas');
+        const croppedContext = croppedCanvas.getContext('2d')!;
+        croppedCanvas.width = viewport.width;
+        croppedCanvas.height = croppedHeight;
+        
+        croppedContext.drawImage(
+          canvas,
+          0, cropTop, viewport.width, croppedHeight,
+          0, 0, viewport.width, croppedHeight
+        );
+        
+        pageImages.push(croppedCanvas.toDataURL('image/png'));
+      } else {
+        pageImages.push(canvas.toDataURL('image/png'));
+      }
     }
     
     return { text: fullText, pageImages };
