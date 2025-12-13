@@ -11,6 +11,8 @@ import area from "@turf/area";
 import { kml } from "@tmcw/togeojson";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import JSZip from "jszip";
+import shp from "shpjs";
 
 interface FieldUploadInterfaceProps {
   fieldId: string | null;
@@ -294,15 +296,72 @@ export const FieldUploadInterface = ({ fieldId, farmerName, onBack }: FieldUploa
         
         geoJSON.features = validFeatures;
       } else if (file.name.endsWith('.kmz')) {
-        toast({
-          title: "KMZ Not Supported",
-          description: "Please extract the KML file from the KMZ archive and upload it directly",
-          variant: "destructive",
-        });
-        setUploading(false);
-        return;
+        // KMZ is a zipped KML file
+        const arrayBuffer = await file.arrayBuffer();
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        
+        // Find the KML file inside the KMZ
+        const kmlFile = Object.keys(zip.files).find(name => name.endsWith('.kml'));
+        if (!kmlFile) {
+          throw new Error("No KML file found inside KMZ archive");
+        }
+        
+        const kmlText = await zip.files[kmlFile].async("text");
+        const parser = new DOMParser();
+        const kmlDoc = parser.parseFromString(kmlText, "text/xml");
+        
+        const parseError = kmlDoc.querySelector("parsererror");
+        if (parseError) {
+          throw new Error("Invalid KML file inside KMZ: XML parsing failed");
+        }
+        
+        geoJSON = kml(kmlDoc);
+        
+        if (!geoJSON) {
+          throw new Error("Failed to parse KML from KMZ - no valid geometry found");
+        }
+        
+        // Normalize to FeatureCollection
+        if (geoJSON.type === "Feature") {
+          geoJSON = { type: "FeatureCollection", features: [geoJSON] };
+        } else if (geoJSON.type !== "FeatureCollection") {
+          geoJSON = { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: geoJSON }] };
+        }
+        
+        const validFeatures = geoJSON.features?.filter((f: any) => f.geometry && f.geometry.type) || [];
+        if (validFeatures.length === 0) {
+          throw new Error("No valid polygon geometry found in KMZ file");
+        }
+        geoJSON.features = validFeatures;
+        
+      } else if (file.name.endsWith('.shp') || file.name.endsWith('.zip')) {
+        // Shapefile or zip containing shapefile
+        const arrayBuffer = await file.arrayBuffer();
+        geoJSON = await shp(arrayBuffer);
+        
+        if (!geoJSON) {
+          throw new Error("Failed to parse Shapefile - no valid geometry found");
+        }
+        
+        // shpjs can return an array of FeatureCollections or a single FeatureCollection
+        if (Array.isArray(geoJSON)) {
+          // Merge all feature collections
+          const allFeatures = geoJSON.flatMap((fc: any) => fc.features || []);
+          geoJSON = { type: "FeatureCollection", features: allFeatures };
+        } else if (geoJSON.type === "Feature") {
+          geoJSON = { type: "FeatureCollection", features: [geoJSON] };
+        } else if (geoJSON.type !== "FeatureCollection") {
+          geoJSON = { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: geoJSON }] };
+        }
+        
+        const validFeatures = geoJSON.features?.filter((f: any) => f.geometry && f.geometry.type) || [];
+        if (validFeatures.length === 0) {
+          throw new Error("No valid polygon geometry found in Shapefile");
+        }
+        geoJSON.features = validFeatures;
+        
       } else {
-        throw new Error("Unsupported file format. Please use .geojson, .json, or .kml");
+        throw new Error("Unsupported file format. Please use .geojson, .json, .kml, .kmz, .shp, or .zip");
       }
 
       const areaInSqMeters = area(geoJSON);
@@ -373,12 +432,12 @@ export const FieldUploadInterface = ({ fieldId, farmerName, onBack }: FieldUploa
                 {geometry ? "File Uploaded" : "Drop your field file here"}
               </h3>
               <p className="text-muted-foreground">
-                Supported formats: .geojson, .json, .kml
+                Supported formats: .geojson, .json, .kml, .kmz, .shp, .zip
               </p>
             </div>
             <Input
               type="file"
-              accept=".geojson,.json,.kml"
+              accept=".geojson,.json,.kml,.kmz,.shp,.zip"
               onChange={handleFileUpload}
               disabled={uploading || processing}
               className="max-w-md mx-auto cursor-pointer file:cursor-pointer"
