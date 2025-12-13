@@ -252,11 +252,47 @@ export const FieldUploadInterface = ({ fieldId, farmerName, onBack }: FieldUploa
       } else if (file.name.endsWith('.kml')) {
         const parser = new DOMParser();
         const kmlDoc = parser.parseFromString(text, "text/xml");
+        
+        // Check for XML parsing errors
+        const parseError = kmlDoc.querySelector("parsererror");
+        if (parseError) {
+          throw new Error("Invalid KML file: XML parsing failed");
+        }
+        
         geoJSON = kml(kmlDoc);
         
-        if (!geoJSON.features || geoJSON.features.length === 0) {
-          throw new Error("No valid geometry found in KML file");
+        // Check if kml() returned null
+        if (!geoJSON) {
+          throw new Error("Failed to parse KML file - no valid geometry found");
         }
+        
+        // Normalize to FeatureCollection if needed
+        if (geoJSON.type === "Feature") {
+          geoJSON = {
+            type: "FeatureCollection",
+            features: [geoJSON]
+          };
+        } else if (geoJSON.type !== "FeatureCollection") {
+          geoJSON = {
+            type: "FeatureCollection",
+            features: [{
+              type: "Feature",
+              properties: {},
+              geometry: geoJSON
+            }]
+          };
+        }
+        
+        // Filter out features without valid geometry
+        const validFeatures = geoJSON.features?.filter(
+          (f: any) => f.geometry && f.geometry.type
+        ) || [];
+        
+        if (validFeatures.length === 0) {
+          throw new Error("No valid polygon geometry found in KML file");
+        }
+        
+        geoJSON.features = validFeatures;
       } else if (file.name.endsWith('.kmz')) {
         toast({
           title: "KMZ Not Supported",
