@@ -20,29 +20,30 @@ interface FieldUploadInterfaceProps {
   onBack: () => void;
 }
 
-type TerrainType = "osm" | "satellite" | "terrain" | "topo";
+type TerrainType = "osm" | "satellite" | "hybrid" | "terrain";
 type IndexType = "none" | "ndvi" | "msavi" | "evi" | "ndwi";
 
-const terrainOptions: Record<TerrainType, { label: string; url: string; attribution: string }> = {
+const terrainOptions: Record<TerrainType, { label: string; url: string; attribution: string; labelsUrl?: string }> = {
   osm: {
     label: "OpenStreetMap",
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   },
   satellite: {
-    label: "Satellite (ESRI)",
+    label: "Satellite",
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: '&copy; <a href="https://www.esri.com/">ESRI</a>'
+  },
+  hybrid: {
+    label: "Hybrid (Labels)",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    labelsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
     attribution: '&copy; <a href="https://www.esri.com/">ESRI</a>'
   },
   terrain: {
     label: "Terrain",
     url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
     attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
-  },
-  topo: {
-    label: "Topo (Stamen)",
-    url: "https://stamen-tiles-{s}.a.ssl.fastly.net/terrain/{z}/{x}/{y}.png",
-    attribution: '&copy; <a href="http://stamen.com">Stamen Design</a>'
   }
 };
 
@@ -88,6 +89,7 @@ export const FieldUploadInterface = ({ fieldId, farmerName, onBack }: FieldUploa
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const labelsLayerRef = useRef<L.TileLayer | null>(null);
   const geoJsonLayerRef = useRef<L.GeoJSON | null>(null);
   const indexLayerRef = useRef<L.GeoJSON | null>(null);
 
@@ -115,14 +117,31 @@ export const FieldUploadInterface = ({ fieldId, farmerName, onBack }: FieldUploa
   useEffect(() => {
     if (!mapRef.current) return;
 
+    // Remove existing layers
     if (tileLayerRef.current) {
       mapRef.current.removeLayer(tileLayerRef.current);
+    }
+    if (labelsLayerRef.current) {
+      mapRef.current.removeLayer(labelsLayerRef.current);
+      labelsLayerRef.current = null;
     }
 
     const terrainConfig = terrainOptions[terrain];
     tileLayerRef.current = L.tileLayer(terrainConfig.url, {
       attribution: terrainConfig.attribution
     }).addTo(mapRef.current);
+
+    // Add labels layer for hybrid terrain
+    if (terrainConfig.labelsUrl) {
+      labelsLayerRef.current = L.tileLayer(terrainConfig.labelsUrl, {
+        attribution: ''
+      }).addTo(mapRef.current);
+    }
+
+    // Ensure geometry layer stays on top
+    if (geoJsonLayerRef.current) {
+      geoJsonLayerRef.current.bringToFront();
+    }
   }, [terrain]);
 
   // Update geometry layer
